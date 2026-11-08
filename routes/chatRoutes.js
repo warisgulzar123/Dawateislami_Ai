@@ -159,6 +159,19 @@ router.post('/chat', async (req, res) => {
       sessionId = crypto.randomUUID();
     }
 
+    // Immediate SSE streaming initialization to prevent Vercel proxy buffer and gateway timeouts
+    if (isStream) {
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('Content-Encoding', 'none');
+      res.setHeader('X-Accel-Buffering', 'no');
+      if (typeof res.flushHeaders === 'function') {
+        res.flushHeaders();
+      }
+      res.write(': heartbeat\n\n');
+    }
+
     // Verify Gemini API key configuration
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -289,14 +302,6 @@ router.post('/chat', async (req, res) => {
 
     // 3. STREAMING EXECUTION (Server-Sent Events) - Instant First-Token Output
     if (isStream) {
-      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, no-transform');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no');
-      if (typeof res.flushHeaders === 'function') {
-        res.flushHeaders();
-      }
-
       let streamResponse;
       try {
         streamResponse = await ai.models.generateContentStream({
@@ -330,6 +335,13 @@ router.post('/chat', async (req, res) => {
           fullReply += token;
           res.write(`data: ${JSON.stringify({ token, sessionId })}\n\n`);
         }
+      }
+
+      // Guarantee stream response is never empty
+      if (!fullReply.trim()) {
+        const fallbackText = 'معذرت، اس وقت سرور سے جواب موصول نہیں ہو سکا۔ براہ کرم دوبارہ کوشش فرمائیں۔';
+        res.write(`data: ${JSON.stringify({ token: fallbackText, sessionId })}\n\n`);
+        fullReply = fallbackText;
       }
 
       res.write(`data: [DONE]\n\n`);
@@ -431,3 +443,4 @@ router.post('/chat/reset', (req, res) => {
 });
 
 module.exports = router;
+module.exports.maxDuration = 60;

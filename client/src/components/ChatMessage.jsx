@@ -14,12 +14,16 @@ const isUrduText = (text) => {
 export default function ChatMessage({ message }) {
   const { sender, text, timestamp } = message;
   const isAI = sender === 'ai';
-  const isUrdu = isUrduText(text);
+  const displayText =
+    isAI && (!text || !text.trim())
+      ? '⚠️ معذرت، سرور سے جواب موصول نہیں ہو سکا۔ براہ کرم دوبارہ کوشش فرمائیں۔ (Empty response)'
+      : text;
+  const isUrdu = isUrduText(displayText);
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
+    if (!displayText) return;
+    navigator.clipboard.writeText(displayText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -116,10 +120,10 @@ export default function ChatMessage({ message }) {
                 )
               }}
             >
-              {text}
+              {displayText}
             </ReactMarkdown>
           ) : (
-            <p className="whitespace-pre-wrap">{text}</p>
+            <p className="whitespace-pre-wrap">{displayText}</p>
           )}
         </div>
       </div>

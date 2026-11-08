@@ -121,9 +121,45 @@ export default function App() {
         })
       });
 
+      // 1. NON-200 HTTP STATUS HANDLING (500, 504, 401, etc.)
       if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || `HTTP error ${response.status}`);
+        let serverErrorDetail = '';
+        try {
+          const errData = await response.json();
+          serverErrorDetail = errData.error || errData.message || '';
+        } catch {
+          const rawText = await response.text().catch(() => '');
+          if (rawText && rawText.length < 200) {
+            serverErrorDetail = rawText;
+          }
+        }
+
+        const statusLabel =
+          response.status === 504
+            ? '504 Gateway Timeout'
+            : response.status === 500
+            ? '500 Internal Server Error'
+            : response.status === 401
+            ? '401 Unauthorized'
+            : `${response.status}`;
+
+        const errorMessage = `Error: Unable to connect to server. Status: ${statusLabel}${
+          serverErrorDetail ? ` (${serverErrorDetail})` : ''
+        }`;
+
+        // Directly display visible error message inside the AI response bubble
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiMessageId
+              ? {
+                  ...m,
+                  text: `⚠️ **${errorMessage}**\n\nمعذرت، اس وقت سرور سے رابطہ نہیں ہو سکا۔ براہ کرم کچھ دیر بعد دوبارہ کوشش فرمائیں یا اپنا انٹرنیٹ کنکشن چیک کریں۔`
+                }
+              : m
+          )
+        );
+        setErrorBanner(errorMessage);
+        return;
       }
 
       const contentType = response.headers.get('content-type') || '';
@@ -150,6 +186,21 @@ export default function App() {
 
             try {
               const parsed = JSON.parse(dataStr);
+
+              // Server-streamed error payload
+              if (parsed.error) {
+                const streamErr = `Error: ${parsed.error}`;
+                accumulatedText = accumulatedText
+                  ? `${accumulatedText}\n\n⚠️ **${streamErr}**`
+                  : `⚠️ **${streamErr}**`;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === aiMessageId ? { ...m, text: accumulatedText } : m
+                  )
+                );
+                continue;
+              }
+
               if (parsed.token) {
                 accumulatedText += parsed.token;
                 setMessages((prev) =>
@@ -158,6 +209,7 @@ export default function App() {
                   )
                 );
               }
+
               if (parsed.sessionId && parsed.sessionId !== sessionId) {
                 setSessionId(parsed.sessionId);
                 localStorage.setItem('dawateislami_session_id', parsed.sessionId);
@@ -167,29 +219,44 @@ export default function App() {
             }
           }
         }
+
+        // CRITICAL GUARANTEE: Response bubble NEVER remains empty/blank
+        if (!accumulatedText.trim()) {
+          const emptyFallback =
+            '⚠️ **Error: Empty response received from server.**\n\nمعذرت، اس وقت سرور سے جواب موصول نہیں ہو سکا۔ براہ کرم دوبارہ کوشش فرمائیں۔';
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMessageId ? { ...m, text: emptyFallback } : m
+            )
+          );
+        }
       } else {
         // Fallback for non-streaming response
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
+        const replyText =
+          data.reply ||
+          (data.error ? `⚠️ **Error: ${data.error}**` : '') ||
+          '⚠️ **Error: Empty response received from server.**\n\nمعذرت، اس وقت سرور سے جواب موصول نہیں ہو سکا۔';
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === aiMessageId ? { ...m, text: data.reply || '' } : m
+            m.id === aiMessageId ? { ...m, text: replyText } : m
           )
         );
       }
     } catch (err) {
       console.error('API Error:', err);
       const errorMsg =
-        err.message ||
-        'Unable to connect to the assistant server. Please check your network connection.';
+        err.message || 'Error: Unable to connect to server. Please check your network connection.';
 
       setErrorBanner(errorMsg);
 
+      // ALWAYS populate visible text in the bubble so it never remains blank
       setMessages((prev) =>
         prev.map((m) =>
           m.id === aiMessageId
             ? {
                 ...m,
-                text: `⚠️ **Server Connection Notice:** ${errorMsg}\n\nPlease verify that the backend server is running.`
+                text: `⚠️ **${errorMsg}**\n\nمعذرت، سرور سے رابطہ قائم نہیں ہو سکا۔ براہ کرم کچھ دیر بعد دوبارہ کوشش فرمائیں۔`
               }
             : m
         )
