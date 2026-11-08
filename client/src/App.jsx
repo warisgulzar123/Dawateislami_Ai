@@ -8,8 +8,7 @@ import ChatInput from './components/ChatInput';
 import AuthModal from './components/AuthModal';
 import AdminPanel from './components/AdminPanel';
 import { AlertCircle, Bot } from 'lucide-react';
-
-const API_BASE_URL = 'http://localhost:5000/api';
+import { API_BASE_URL } from './config/api';
 
 export default function App() {
   // Navigation & View State ('chat' | 'admin')

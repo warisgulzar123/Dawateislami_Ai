@@ -81,14 +81,16 @@ app.use((err, req, res, next) => {
 });
 
 // Start Express Server
-app.listen(PORT, () => {
-  console.log(`====================================================`);
-  console.log(`🚀 Dawat-e-Islami AI & Admin Backend on port ${PORT}`);
-  console.log(`📡 Health Check: http://localhost:${PORT}/api/health`);
-  console.log(`🔐 Auth API:     http://localhost:${PORT}/api/auth/login`);
-  console.log(`📚 Knowledge:    http://localhost:${PORT}/api/knowledge`);
-  console.log(`💬 Chat API:     http://localhost:${PORT}/api/chat`);
-  console.log(`====================================================`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`====================================================`);
+    console.log(`🚀 Dawat-e-Islami AI & Admin Backend on port ${PORT}`);
+    console.log(`📡 Health Check: http://localhost:${PORT}/api/health`);
+    console.log(`🔐 Auth API:     http://localhost:${PORT}/api/auth/login`);
+    console.log(`📚 Knowledge:    http://localhost:${PORT}/api/knowledge`);
+    console.log(`💬 Chat API:     http://localhost:${PORT}/api/chat`);
+    console.log(`====================================================`);
+  });
+}
 
 module.exports = app;
